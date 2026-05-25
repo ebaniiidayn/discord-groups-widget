@@ -37,6 +37,8 @@ body {
   overflow: hidden;
   background: var(--surface);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .widget-clickable {
@@ -95,6 +97,9 @@ h1 {
   padding: 10px 8px 52px;
   display: grid;
   gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .section {

@@ -21,6 +21,16 @@ const elements = {
   footer: document.getElementById("footer-label")
 };
 
+function scrollGroupsToBottom() {
+  if (!elements.groups) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    elements.groups.scrollTop = elements.groups.scrollHeight;
+  });
+}
+
 function setupWidgetLink() {
   if (!elements.widget || !SETTINGS.inviteUrl) {
     return;
@@ -92,6 +102,7 @@ function renderSections(sections) {
 
   const html = safeSections.map(buildSection).join("");
   elements.groups.innerHTML = html || `<p class="empty">No voice channels available</p>`;
+  scrollGroupsToBottom();
 }
 
 async function loadDiscordGroups(guildId) {
@@ -217,6 +228,7 @@ async function refresh() {
   } catch (error) {
     elements.groups.innerHTML = `<p class="empty">${escapeHtml(error.message || "Unknown error")}</p>`;
     elements.counter.textContent = "error";
+    scrollGroupsToBottom();
   }
 }
 
