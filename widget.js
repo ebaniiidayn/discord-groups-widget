@@ -173,12 +173,19 @@ function escapeHtml(value) {
 async function refresh() {
   try {
     if (SETTINGS.mode === "backend") {
-      if (!SETTINGS.backendUrl) {
-        throw new Error("Set backendUrl in widget.js");
+      if (SETTINGS.backendUrl) {
+        const groups = await loadBackendGroups(SETTINGS.backendUrl);
+        render(groups);
+        return;
       }
 
-      const groups = await loadBackendGroups(SETTINGS.backendUrl);
-      render(groups);
+      if (SETTINGS.discordGuildId) {
+        const groups = await loadDiscordGroups(SETTINGS.discordGuildId);
+        render(groups);
+        return;
+      }
+
+      render([]);
       return;
     }
 
