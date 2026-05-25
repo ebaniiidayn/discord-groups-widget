@@ -6,6 +6,7 @@ const TOKEN = (process.env.DISCORD_TOKEN || "").trim();
 const GUILD_ID = (process.env.DISCORD_GUILD_ID || "").trim();
 const PORT = Number(process.env.PORT || 3000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+const REFRESH_MS = Number(process.env.REFRESH_MS || 15000);
 const hasConfig = Boolean(TOKEN && GUILD_ID);
 
 const app = express();
@@ -21,6 +22,9 @@ const client = new Client({
 });
 
 let isReady = false;
+let cachedGroups = [];
+let lastUpdated = 0;
+let lastError = "";
 
 function normalizeStatus(status) {
   if (status === "online" || status === "idle" || status === "dnd" || status === "offline") {
@@ -41,9 +45,9 @@ function extractGame(member) {
 }
 
 async function buildGroups() {
-  const guild = await client.guilds.fetch(GUILD_ID);
+  const guild = client.guilds.cache.get(GUILD_ID) || (await client.guilds.fetch(GUILD_ID));
   await guild.channels.fetch();
-  await guild.members.fetch();
+  await guild.members.fetch().catch(() => null);
 
   const channels = guild.channels.cache
     .filter((channel) => channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice)
@@ -86,8 +90,31 @@ async function buildGroups() {
   return channels.map(({ name, members }) => ({ name, members }));
 }
 
+async function refreshGroupsCache() {
+  if (!isReady) {
+    return;
+  }
+
+  try {
+    const groups = await buildGroups();
+    cachedGroups = groups;
+    lastUpdated = Date.now();
+    lastError = "";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    lastError = message;
+    console.error(`Failed to refresh groups: ${message}`);
+  }
+}
+
 app.get("/health", (req, res) => {
-  res.json({ ok: true, ready: isReady, configured: hasConfig });
+  res.json({
+    ok: true,
+    ready: isReady,
+    configured: hasConfig,
+    lastUpdated,
+    lastError
+  });
 });
 
 app.get("/", (req, res) => {
@@ -110,18 +137,23 @@ app.get("/api/groups", async (req, res) => {
     return;
   }
 
-  try {
-    const groups = await buildGroups();
-    res.json({ groups });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({ error: message });
+  if (cachedGroups.length === 0) {
+    await refreshGroupsCache();
   }
+
+  if (cachedGroups.length === 0 && lastError) {
+    res.status(500).json({ error: lastError });
+    return;
+  }
+
+  res.json({ groups: cachedGroups, lastUpdated, lastError });
 });
 
-client.once("ready", () => {
+client.once("ready", async () => {
   isReady = true;
   console.log(`Discord bot is ready as ${client.user?.tag || "unknown"}`);
+  await refreshGroupsCache();
+  setInterval(refreshGroupsCache, REFRESH_MS);
 });
 
 if (hasConfig) {

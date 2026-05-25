@@ -1,6 +1,6 @@
 const SETTINGS = {
   mode: "backend",
-  refreshMs: 10000,
+  refreshMs: 20000,
   title: "FACEIT GROUPS",
   footerLabel: "Twitch Channel Widget",
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
