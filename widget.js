@@ -4,6 +4,7 @@ const SETTINGS = {
   title: "FACEIT",
   footerLabel: "discord channels",
   fixedOnlineCount: 97374,
+  fixedMetaMembersCount: 3,
   inviteUrl: "https://discord.gg/faceit",
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
   discordGuildId: "1091341858090782793",
@@ -61,6 +62,7 @@ function buildChannel(channel) {
   const count = Number(channel?.memberCount || 0);
   const limit = Number(channel?.userLimit || 0);
   const badge = limit > 0 ? `${count}/${limit}` : `${count}`;
+  const fixedCount = Number(SETTINGS.fixedMetaMembersCount || 3);
 
   return `
     <li class="channel-row channel-voice">
@@ -69,7 +71,7 @@ function buildChannel(channel) {
         <span class="channel-name">${escapeHtml(channel?.name || "unknown-channel")}</span>
       </div>
       <span class="channel-badge">${badge}</span>
-      <span class="channel-meta">${count} ${pluralizeEn(count)}</span>
+      <span class="channel-meta">${fixedCount} ${pluralizeEn(fixedCount)}</span>
     </li>
   `;
 }
