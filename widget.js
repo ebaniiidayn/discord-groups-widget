@@ -119,19 +119,21 @@ async function loadDiscordGroups(guildId) {
     });
   }
 
-  const channelMap = new Map(channels.map((channel) => [channel.id, channel]));
-
-  return Array.from(membersByChannel.entries())
-    .map(([channelId, channelMembers]) => {
-      const channel = channelMap.get(channelId);
-      return {
-        name: channel?.name || "Lobby",
-        sort: channel?.position ?? Number.MAX_SAFE_INTEGER,
-        members: channelMembers
-      };
-    })
+  const groups = channels
+    .map((channel) => ({
+      name: channel?.name || "Unnamed Channel",
+      sort: channel?.position ?? Number.MAX_SAFE_INTEGER,
+      members: membersByChannel.get(channel.id) || []
+    }))
     .sort((a, b) => a.sort - b.sort)
     .map(({ name, members: groupMembers }) => ({ name, members: groupMembers }));
+
+  const lobbyMembers = membersByChannel.get("no-channel") || [];
+  if (lobbyMembers.length) {
+    groups.push({ name: "Lobby", members: lobbyMembers });
+  }
+
+  return groups;
 }
 
 function escapeHtml(value) {
