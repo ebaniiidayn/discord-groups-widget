@@ -6,10 +6,7 @@ const TOKEN = process.env.DISCORD_TOKEN || "";
 const GUILD_ID = process.env.DISCORD_GUILD_ID || "";
 const PORT = Number(process.env.PORT || 3000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
-
-if (!TOKEN || !GUILD_ID) {
-  throw new Error("Missing DISCORD_TOKEN or DISCORD_GUILD_ID");
-}
+const hasConfig = Boolean(TOKEN && GUILD_ID);
 
 const app = express();
 app.use(cors({ origin: ALLOWED_ORIGIN === "*" ? true : ALLOWED_ORIGIN }));
@@ -90,10 +87,24 @@ async function buildGroups() {
 }
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, ready: isReady });
+  res.json({ ok: true, ready: isReady, configured: hasConfig });
+});
+
+app.get("/", (req, res) => {
+  res.json({
+    service: "discord-groups-backend",
+    configured: hasConfig,
+    ready: isReady,
+    endpoints: ["/health", "/api/groups"]
+  });
 });
 
 app.get("/api/groups", async (req, res) => {
+  if (!hasConfig) {
+    res.status(500).json({ error: "Missing DISCORD_TOKEN or DISCORD_GUILD_ID" });
+    return;
+  }
+
   if (!isReady) {
     res.status(503).json({ error: "Discord client is not ready" });
     return;
@@ -113,7 +124,11 @@ client.once("ready", () => {
   console.log(`Discord bot is ready as ${client.user?.tag || "unknown"}`);
 });
 
-client.login(TOKEN);
+if (hasConfig) {
+  client.login(TOKEN);
+} else {
+  console.error("Missing DISCORD_TOKEN or DISCORD_GUILD_ID");
+}
 
 app.listen(PORT, () => {
   console.log(`API server listening on ${PORT}`);
