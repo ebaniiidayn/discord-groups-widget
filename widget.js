@@ -5,6 +5,7 @@ const SETTINGS = {
   footerLabel: "discord channels",
   fixedOnlineCount: 97374,
   fixedMetaMembersCount: 3,
+  fixedMetaChannelName: "Mystic Reverse",
   inviteUrl: "https://discord.gg/faceit",
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
   discordGuildId: "1091341858090782793",
@@ -63,6 +64,10 @@ function buildChannel(channel) {
   const limit = Number(channel?.userLimit || 0);
   const badge = limit > 0 ? `${count}/${limit}` : `${count}`;
   const fixedCount = Number(SETTINGS.fixedMetaMembersCount || 3);
+  const isFixedChannel =
+    String(channel?.name || "").trim().toLowerCase() ===
+    String(SETTINGS.fixedMetaChannelName || "").trim().toLowerCase();
+  const metaCount = isFixedChannel ? fixedCount : count;
 
   return `
     <li class="channel-row channel-voice">
@@ -71,7 +76,7 @@ function buildChannel(channel) {
         <span class="channel-name">${escapeHtml(channel?.name || "unknown-channel")}</span>
       </div>
       <span class="channel-badge">${badge}</span>
-      <span class="channel-meta">${fixedCount} ${pluralizeEn(fixedCount)}</span>
+      <span class="channel-meta">${metaCount} ${pluralizeEn(metaCount)}</span>
     </li>
   `;
 }
