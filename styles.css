@@ -41,10 +41,13 @@ body {
 
 .widget-clickable {
   cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .widget-clickable:hover {
   border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
 }
 
 .widget-header {
@@ -76,13 +79,16 @@ h1 {
   line-height: 1;
   font-weight: 700;
   text-transform: uppercase;
+  color: #f3f4ff;
+  text-shadow: 0 0 12px rgba(88, 101, 242, 0.45);
 }
 
 #online-counter {
   margin: 0;
   font-size: 14px;
-  font-weight: 600;
-  color: #b5bac1;
+  font-weight: 700;
+  color: #57f287;
+  text-shadow: 0 0 10px rgba(87, 242, 135, 0.45);
 }
 
 .groups {
@@ -167,7 +173,7 @@ h1 {
   grid-column: 1 / -1;
   margin-left: 16px;
   margin: 0;
-  color: var(--text-muted);
+  color: #a4abb3;
   font-size: 12px;
 }
 
