@@ -4,6 +4,7 @@ const SETTINGS = {
   title: "FACEIT",
   footerLabel: "discord channels",
   fixedOnlineCount: 97374,
+  inviteUrl: "https://discord.gg/faceit",
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
 
   discordGuildId: "1091341858090782793",
@@ -27,11 +28,34 @@ const SETTINGS = {
 };
 
 const elements = {
+  widget: document.querySelector(".widget"),
   groups: document.getElementById("groups"),
   title: document.getElementById("widget-title"),
   counter: document.getElementById("online-counter"),
   footer: document.getElementById("footer-label")
 };
+
+function setupWidgetLink() {
+  if (!elements.widget || !SETTINGS.inviteUrl) {
+    return;
+  }
+
+  const openInvite = () => {
+    window.open(SETTINGS.inviteUrl, "_blank", "noopener,noreferrer");
+  };
+
+  elements.widget.classList.add("widget-clickable");
+  elements.widget.setAttribute("tabindex", "0");
+  elements.widget.setAttribute("role", "link");
+  elements.widget.setAttribute("aria-label", "Open Discord invite");
+  elements.widget.addEventListener("click", openInvite);
+  elements.widget.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openInvite();
+    }
+  });
+}
 
 function pluralizeUa(count) {
   const n = Math.abs(Number(count)) % 100;
@@ -273,3 +297,4 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, SETTINGS.refreshMs);
+setupWidgetLink();

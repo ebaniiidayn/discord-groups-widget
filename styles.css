@@ -39,6 +39,14 @@ body {
   position: relative;
 }
 
+.widget-clickable {
+  cursor: pointer;
+}
+
+.widget-clickable:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
 .widget-header {
   display: flex;
   align-items: center;
