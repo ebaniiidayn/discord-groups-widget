@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: discord-groups-backend
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_GUILD_ID
+        value: 1091341858090782793
+      - key: ALLOWED_ORIGIN
+        value: https://ebaniiidayn.github.io

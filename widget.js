@@ -1,8 +1,9 @@
 const SETTINGS = {
-  mode: "discord",
-  refreshMs: 30000,
+  mode: "backend",
+  refreshMs: 10000,
   title: "FACEIT GROUPS",
   footerLabel: "Twitch Channel Widget",
+  backendUrl: "",
 
   discordGuildId: "1091341858090782793",
 
@@ -136,6 +137,30 @@ async function loadDiscordGroups(guildId) {
   return groups;
 }
 
+async function loadBackendGroups(endpoint) {
+  const response = await fetch(endpoint, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error(`Backend request failed: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (!payload || !Array.isArray(payload.groups)) {
+    throw new Error("Invalid backend payload");
+  }
+
+  return payload.groups.map((group) => ({
+    name: group?.name || "Unnamed Group",
+    members: Array.isArray(group?.members)
+      ? group.members.map((member) => ({
+          name: member?.name || "Unknown",
+          status: getSafeStatus(member?.status),
+          game: member?.game || ""
+        }))
+      : []
+  }));
+}
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -147,6 +172,16 @@ function escapeHtml(value) {
 
 async function refresh() {
   try {
+    if (SETTINGS.mode === "backend") {
+      if (!SETTINGS.backendUrl) {
+        throw new Error("Set backendUrl in widget.js");
+      }
+
+      const groups = await loadBackendGroups(SETTINGS.backendUrl);
+      render(groups);
+      return;
+    }
+
     if (SETTINGS.mode === "discord") {
       if (!SETTINGS.discordGuildId) {
         render([]);
