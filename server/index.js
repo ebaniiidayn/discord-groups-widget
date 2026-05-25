@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import { ChannelType, Client, GatewayIntentBits } from "discord.js";
 
-const TOKEN = process.env.DISCORD_TOKEN || "";
-const GUILD_ID = process.env.DISCORD_GUILD_ID || "";
+const TOKEN = (process.env.DISCORD_TOKEN || "").trim();
+const GUILD_ID = (process.env.DISCORD_GUILD_ID || "").trim();
 const PORT = Number(process.env.PORT || 3000);
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
 const hasConfig = Boolean(TOKEN && GUILD_ID);
