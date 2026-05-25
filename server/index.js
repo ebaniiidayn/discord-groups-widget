@@ -22,72 +22,89 @@ const client = new Client({
 });
 
 let isReady = false;
-let cachedGroups = [];
+let cachedPayload = { sections: [] };
 let lastUpdated = 0;
 let lastError = "";
-
-function normalizeStatus(status) {
-  if (status === "online" || status === "idle" || status === "dnd" || status === "offline") {
-    return status;
-  }
-
-  return "offline";
-}
-
-function extractGame(member) {
-  const activities = member?.presence?.activities;
-  if (!Array.isArray(activities) || activities.length === 0) {
-    return "";
-  }
-
-  const first = activities.find((a) => typeof a?.name === "string" && a.name.trim().length > 0);
-  return first?.name || "";
-}
 
 async function buildGroups() {
   const guild = client.guilds.cache.get(GUILD_ID) || (await client.guilds.fetch(GUILD_ID));
   await guild.channels.fetch();
   await guild.members.fetch().catch(() => null);
 
-  const channels = guild.channels.cache
-    .filter((channel) => channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice)
-    .map((channel) => ({
-      id: channel.id,
-      name: channel.name,
-      sort: channel.rawPosition,
-      members: []
-    }))
-    .sort((a, b) => a.sort - b.sort);
+  const categorySort = new Map();
+  for (const channel of guild.channels.cache.values()) {
+    if (channel.type === ChannelType.GuildCategory) {
+      categorySort.set(channel.id, channel.rawPosition);
+    }
+  }
 
-  const map = new Map(channels.map((c) => [c.id, c]));
-
+  const voiceCounts = new Map();
   for (const voiceState of guild.voiceStates.cache.values()) {
     if (!voiceState.channelId) {
       continue;
     }
 
-    const group = map.get(voiceState.channelId);
-    if (!group) {
+    const current = voiceCounts.get(voiceState.channelId) || 0;
+    voiceCounts.set(voiceState.channelId, current + 1);
+  }
+
+  const sections = new Map();
+
+  function sectionFor(channel, fallbackName) {
+    const sectionId = channel.parentId || fallbackName;
+    if (!sections.has(sectionId)) {
+      sections.set(sectionId, {
+        id: sectionId,
+        name: channel.parent?.name || fallbackName,
+        sort: channel.parentId ? (categorySort.get(channel.parentId) ?? 10000) : 10001,
+        channels: []
+      });
+    }
+
+    return sections.get(sectionId);
+  }
+
+  for (const channel of guild.channels.cache.values()) {
+    if (channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement) {
+      const section = sectionFor(channel, "Text channels");
+      section.channels.push({
+        id: channel.id,
+        name: channel.name,
+        type: "text",
+        sort: channel.rawPosition
+      });
       continue;
     }
 
-    const { member } = voiceState;
-    if (!member) {
-      continue;
+    if (channel.type === ChannelType.GuildVoice || channel.type === ChannelType.GuildStageVoice) {
+      const section = sectionFor(channel, "Voice channels");
+      section.channels.push({
+        id: channel.id,
+        name: channel.name,
+        type: "voice",
+        sort: channel.rawPosition,
+        memberCount: voiceCounts.get(channel.id) || 0,
+        userLimit: channel.userLimit || 0
+      });
     }
-
-    group.members.push({
-      name: member.displayName || member.user?.username || "Unknown",
-      status: normalizeStatus(member.presence?.status),
-      game: extractGame(member)
-    });
   }
 
-  for (const group of channels) {
-    group.members.sort((a, b) => a.name.localeCompare(b.name, "uk"));
-  }
-
-  return channels.map(({ name, members }) => ({ name, members }));
+  return Array.from(sections.values())
+    .map((section) => ({
+      name: section.name,
+      sort: section.sort,
+      channels: section.channels
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ id, name, type, memberCount, userLimit }) => ({
+          id,
+          name,
+          type,
+          memberCount: memberCount || 0,
+          userLimit: userLimit || 0
+        }))
+    }))
+    .sort((a, b) => a.sort - b.sort)
+    .map(({ name, channels }) => ({ name, channels }));
 }
 
 async function refreshGroupsCache() {
@@ -96,8 +113,8 @@ async function refreshGroupsCache() {
   }
 
   try {
-    const groups = await buildGroups();
-    cachedGroups = groups;
+    const sections = await buildGroups();
+    cachedPayload = { sections };
     lastUpdated = Date.now();
     lastError = "";
   } catch (error) {
@@ -137,16 +154,16 @@ app.get("/api/groups", async (req, res) => {
     return;
   }
 
-  if (cachedGroups.length === 0) {
+  if (!Array.isArray(cachedPayload.sections) || cachedPayload.sections.length === 0) {
     await refreshGroupsCache();
   }
 
-  if (cachedGroups.length === 0 && lastError) {
+  if ((!Array.isArray(cachedPayload.sections) || cachedPayload.sections.length === 0) && lastError) {
     res.status(500).json({ error: lastError });
     return;
   }
 
-  res.json({ groups: cachedGroups, lastUpdated, lastError });
+  res.json({ ...cachedPayload, lastUpdated, lastError });
 });
 
 client.once("ready", async () => {

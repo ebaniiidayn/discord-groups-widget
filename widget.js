@@ -1,8 +1,9 @@
 const SETTINGS = {
   mode: "backend",
   refreshMs: 20000,
-  title: "FACEIT GROUPS",
-  footerLabel: "Twitch Channel Widget",
+  title: "FACEIT",
+  footerLabel: "discord channels",
+  fixedOnlineCount: 97374,
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
 
   discordGuildId: "1091341858090782793",
@@ -32,66 +33,78 @@ const elements = {
   footer: document.getElementById("footer-label")
 };
 
-const STATUS_CLASS = {
-  online: "status-online",
-  idle: "status-idle",
-  dnd: "status-dnd",
-  offline: "status-offline"
-};
+function pluralizeUa(count) {
+  const n = Math.abs(Number(count)) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) {
+    return "учасників";
+  }
 
-function getSafeStatus(status) {
-  return STATUS_CLASS[status] ? status : "offline";
+  if (n1 > 1 && n1 < 5) {
+    return "учасники";
+  }
+
+  if (n1 === 1) {
+    return "учасник";
+  }
+
+  return "учасників";
 }
 
-function buildGroup(group) {
-  const members = Array.isArray(group.members) ? group.members : [];
+function buildChannel(channel) {
+  const type = channel?.type === "text" ? "text" : "voice";
+  const name = escapeHtml(channel?.name || "unknown-channel");
 
-  const membersHtml = members.length
-    ? members
-        .map((member) => {
-          const status = getSafeStatus(member.status);
-          const game = member.game ? String(member.game) : "";
+  if (type === "text") {
+    return `
+      <li class="channel-row channel-text">
+        <span class="channel-prefix">#</span>
+        <span class="channel-name">${name}</span>
+      </li>
+    `;
+  }
 
-          return `
-            <li class="member-item">
-              <div class="member-left">
-                <span class="status ${STATUS_CLASS[status]}" aria-hidden="true"></span>
-                <span class="member-name">${escapeHtml(member.name || "Unknown")}</span>
-              </div>
-              <span class="member-meta">${escapeHtml(game)}</span>
-            </li>
-          `;
-        })
-        .join("")
-    : `<li class="empty">No members in this group</li>`;
+  const count = Number(channel?.memberCount || 0);
+  const limit = Number(channel?.userLimit || 0);
+  const badge = limit > 0 ? `${count}/${limit}` : `${count}`;
 
   return `
-    <article class="group">
-      <header class="group-head">
-        <h2 class="group-name">${escapeHtml(group.name || "Unnamed Group")}</h2>
-        <p class="group-count">${members.length}</p>
-      </header>
-      <ul class="member-list">
-        ${membersHtml}
+    <li class="channel-row channel-voice">
+      <div class="channel-main">
+        <span class="channel-prefix">|</span>
+        <span class="channel-name">${name}</span>
+      </div>
+      <span class="channel-badge">${badge}</span>
+      <span class="channel-meta">${count} ${pluralizeUa(count)}</span>
+    </li>
+  `;
+}
+
+function buildSection(section) {
+  const channels = Array.isArray(section?.channels) ? section.channels : [];
+  return `
+    <article class="section">
+      <h2 class="section-title">${escapeHtml(section?.name || "Channels")}</h2>
+      <ul class="channel-list">
+        ${channels.map(buildChannel).join("")}
       </ul>
     </article>
   `;
 }
 
-function render(groups) {
-  const normalizedGroups = Array.isArray(groups) ? groups : [];
-  const allMembers = normalizedGroups.flatMap((group) => (Array.isArray(group.members) ? group.members : []));
+function renderSections(sections) {
+  const safeSections = Array.isArray(sections) ? sections : [];
 
   elements.title.textContent = SETTINGS.title;
   elements.footer.textContent = SETTINGS.footerLabel;
-  elements.counter.textContent = `${allMembers.length} online`;
+  elements.counter.textContent = `${SETTINGS.fixedOnlineCount} online`;
 
-  if (!normalizedGroups.length) {
-    elements.groups.innerHTML = `<p class="empty">No groups available</p>`;
+  if (!safeSections.length) {
+    elements.groups.innerHTML = `<p class="empty">No channels available</p>`;
     return;
   }
 
-  elements.groups.innerHTML = normalizedGroups.map(buildGroup).join("");
+  elements.groups.innerHTML = safeSections.map(buildSection).join("");
 }
 
 async function loadDiscordGroups(guildId) {
@@ -145,20 +158,39 @@ async function loadBackendGroups(endpoint) {
   }
 
   const payload = await response.json();
-  if (!payload || !Array.isArray(payload.groups)) {
+  if (!payload) {
     throw new Error("Invalid backend payload");
   }
 
-  return payload.groups.map((group) => ({
-    name: group?.name || "Unnamed Group",
-    members: Array.isArray(group?.members)
-      ? group.members.map((member) => ({
-          name: member?.name || "Unknown",
-          status: getSafeStatus(member?.status),
-          game: member?.game || ""
+  if (Array.isArray(payload.sections)) {
+    return payload.sections.map((section) => ({
+      name: section?.name || "Channels",
+      channels: Array.isArray(section?.channels)
+        ? section.channels.map((channel) => ({
+            name: channel?.name || "unknown-channel",
+            type: channel?.type || "voice",
+            memberCount: Number(channel?.memberCount || 0),
+            userLimit: Number(channel?.userLimit || 0)
+          }))
+        : []
+    }));
+  }
+
+  if (Array.isArray(payload.groups)) {
+    return [
+      {
+        name: "Voice channels",
+        channels: payload.groups.map((group) => ({
+          name: group?.name || "unknown-channel",
+          type: "voice",
+          memberCount: Array.isArray(group?.members) ? group.members.length : 0,
+          userLimit: 0
         }))
-      : []
-  }));
+      }
+    ];
+  }
+
+  throw new Error("Invalid backend payload");
 }
 
 function escapeHtml(value) {
@@ -174,33 +206,65 @@ async function refresh() {
   try {
     if (SETTINGS.mode === "backend") {
       if (SETTINGS.backendUrl) {
-        const groups = await loadBackendGroups(SETTINGS.backendUrl);
-        render(groups);
+        const sections = await loadBackendGroups(SETTINGS.backendUrl);
+        renderSections(sections);
         return;
       }
 
       if (SETTINGS.discordGuildId) {
         const groups = await loadDiscordGroups(SETTINGS.discordGuildId);
-        render(groups);
+        const sections = [
+          {
+            name: "Voice channels",
+            channels: groups.map((group) => ({
+              name: group.name,
+              type: "voice",
+              memberCount: Array.isArray(group.members) ? group.members.length : 0,
+              userLimit: 0
+            }))
+          }
+        ];
+        renderSections(sections);
         return;
       }
 
-      render([]);
+      renderSections([]);
       return;
     }
 
     if (SETTINGS.mode === "discord") {
       if (!SETTINGS.discordGuildId) {
-        render([]);
+        renderSections([]);
         return;
       }
 
       const groups = await loadDiscordGroups(SETTINGS.discordGuildId);
-      render(groups);
+      const sections = [
+        {
+          name: "Voice channels",
+          channels: groups.map((group) => ({
+            name: group.name,
+            type: "voice",
+            memberCount: Array.isArray(group.members) ? group.members.length : 0,
+            userLimit: 0
+          }))
+        }
+      ];
+      renderSections(sections);
       return;
     }
 
-    render(SETTINGS.manualGroups);
+    renderSections([
+      {
+        name: "Voice channels",
+        channels: SETTINGS.manualGroups.map((group) => ({
+          name: group.name,
+          type: "voice",
+          memberCount: Array.isArray(group.members) ? group.members.length : 0,
+          userLimit: 0
+        }))
+      }
+    ]);
   } catch (error) {
     elements.groups.innerHTML = `<p class="empty">${escapeHtml(error.message)}</p>`;
     elements.counter.textContent = "error";
