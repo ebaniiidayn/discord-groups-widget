@@ -3,7 +3,7 @@ const SETTINGS = {
   refreshMs: 10000,
   title: "FACEIT GROUPS",
   footerLabel: "Twitch Channel Widget",
-  backendUrl: "",
+  backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
 
   discordGuildId: "1091341858090782793",
 
