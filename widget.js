@@ -4,8 +4,13 @@ const SETTINGS = {
   title: "FACEIT",
   footerLabel: "discord channels",
   fixedOnlineCount: 97374,
-  fixedMetaMembersCount: 3,
-  fixedMetaChannelName: "Mystic Reverse",
+  channelCountOverrides: {
+    "mystic reverse": 6,
+    heavymetal2: 9,
+    backcsgo: 7,
+    teamwsly: 4,
+    tjr: 5
+  },
   inviteUrl: "https://discord.gg/faceit",
   backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
   discordGuildId: "1091341858090782793",
@@ -59,15 +64,21 @@ function pluralizeEn(count) {
   return Number(count) === 1 ? "member" : "members";
 }
 
+function getDisplayCount(channelName, fallbackCount) {
+  const key = String(channelName || "").trim().toLowerCase();
+  const value = SETTINGS.channelCountOverrides?.[key];
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+
+  return fallbackCount;
+}
+
 function buildChannel(channel) {
-  const count = Number(channel?.memberCount || 0);
+  const realCount = Number(channel?.memberCount || 0);
+  const count = getDisplayCount(channel?.name, realCount);
   const limit = Number(channel?.userLimit || 0);
   const badge = limit > 0 ? `${count}/${limit}` : `${count}`;
-  const fixedCount = Number(SETTINGS.fixedMetaMembersCount || 3);
-  const isFixedChannel =
-    String(channel?.name || "").trim().toLowerCase() ===
-    String(SETTINGS.fixedMetaChannelName || "").trim().toLowerCase();
-  const metaCount = isFixedChannel ? fixedCount : count;
 
   return `
     <li class="channel-row channel-voice">
@@ -76,7 +87,7 @@ function buildChannel(channel) {
         <span class="channel-name">${escapeHtml(channel?.name || "unknown-channel")}</span>
       </div>
       <span class="channel-badge">${badge}</span>
-      <span class="channel-meta">${metaCount} ${pluralizeEn(metaCount)}</span>
+      <span class="channel-meta">${count} ${pluralizeEn(count)}</span>
     </li>
   `;
 }
