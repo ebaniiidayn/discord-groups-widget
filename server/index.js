@@ -10,7 +10,33 @@ const REFRESH_MS = Number(process.env.REFRESH_MS || 15000);
 const hasConfig = Boolean(TOKEN && GUILD_ID);
 
 const app = express();
-app.use(cors({ origin: ALLOWED_ORIGIN === "*" ? true : ALLOWED_ORIGIN }));
+
+// Twitch serves the extension iframe from https://<extension_id>.ext-twitch.tv,
+// so we must allow that origin in addition to any explicitly configured ones.
+const allowedOrigins = ALLOWED_ORIGIN.split(",").map((value) => value.trim()).filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  if (ALLOWED_ORIGIN === "*" || allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  try {
+    const { hostname } = new URL(origin);
+    return hostname.endsWith(".ext-twitch.tv") || hostname === "ext-twitch.tv";
+  } catch {
+    return false;
+  }
+}
+
+app.use(
+  cors({
+    origin: (origin, callback) => callback(null, isOriginAllowed(origin))
+  })
+);
 
 const client = new Client({
   intents: [

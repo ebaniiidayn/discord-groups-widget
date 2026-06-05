@@ -111,12 +111,42 @@ function buildSection(section) {
   `;
 }
 
+function applyChrome() {
+  if (elements.title) {
+    elements.title.textContent = SETTINGS.title;
+  }
+  if (elements.footer) {
+    elements.footer.textContent = SETTINGS.footerLabel;
+  }
+  if (elements.counter) {
+    const online = Number(SETTINGS.fixedOnlineCount) || 0;
+    elements.counter.textContent = `${online.toLocaleString("en-US")} online`;
+  }
+}
+
+function buildFallbackSections() {
+  const entries = Object.entries(SETTINGS.channelCountOverrides || {});
+  if (!entries.length) {
+    return [];
+  }
+
+  return [
+    {
+      name: "Voice channels",
+      channels: entries.map(([name, memberCount]) => ({
+        name,
+        type: "voice",
+        memberCount: Number(memberCount) || 0,
+        userLimit: 0
+      }))
+    }
+  ];
+}
+
 function renderSections(sections) {
   const safeSections = Array.isArray(sections) ? sections : [];
 
-  elements.title.textContent = SETTINGS.title;
-  elements.footer.textContent = SETTINGS.footerLabel;
-  elements.counter.textContent = `${SETTINGS.fixedOnlineCount} online`;
+  applyChrome();
 
   const html = safeSections.map(buildSection).join("");
   elements.groups.innerHTML = html || `<p class="empty">No voice channels available</p>`;
@@ -244,12 +274,24 @@ async function refresh() {
       }
     ]);
   } catch (error) {
-    elements.groups.innerHTML = `<p class="empty">${escapeHtml(error.message || "Unknown error")}</p>`;
-    elements.counter.textContent = "error";
-    scrollGroupsToBottom();
+    // Backend unreachable (Render asleep, CSP/CORS, etc.) — never leave the
+    // panel blank: fall back to the configured channel list so it still shows.
+    const fallback = buildFallbackSections();
+    if (fallback.length) {
+      renderSections(fallback);
+    } else {
+      renderSections([]);
+    }
   }
 }
 
+// Paint the title/footer/counter immediately so the panel is never blank,
+// even before the first network request resolves.
+applyChrome();
 refresh();
 setInterval(refresh, SETTINGS.refreshMs);
-setupWidgetLink();
+
+// NOTE: the click-to-Discord link-out is intentionally disabled.
+// Twitch review policy 4.5 rejects Extensions whose principal use is linking
+// viewers to an external site (Discord). This panel is now informational only.
+// To re-enable for a private Hosted Test build, call setupWidgetLink() here.
