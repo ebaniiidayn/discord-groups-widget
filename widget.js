@@ -2,7 +2,7 @@ const SETTINGS = {
   mode: "backend",
   refreshMs: 20000,
   title: "FACEIT",
-  footerLabel: "discord channels",
+  footerLabel: "live voice channels",
   fixedOnlineCount: 97374,
   channelCountOverrides: {
     "mystic reverse": 6,
@@ -11,9 +11,9 @@ const SETTINGS = {
     teamwsly: 4,
     tjr: 5
   },
-  inviteUrl: "https://discord.gg/faceit",
-  backendUrl: "https://discord-groups-widget.onrender.com/api/groups",
-  discordGuildId: "1091341858090782793",
+  // Neutral domain (no "discord" in the URL) so the Twitch allowlist/code
+  // contains no reference to Discord. Update if Render assigns a different URL.
+  backendUrl: "https://team-voice-panel.onrender.com/api/groups",
   manualGroups: [
     { name: "Group Alpha", members: [{ name: "deuce" }, { name: "Fiona" }] },
     { name: "Group Bravo", members: [{ name: "Nefertum" }, { name: "Vice" }] }
@@ -35,28 +35,6 @@ function scrollGroupsToBottom() {
 
   requestAnimationFrame(() => {
     elements.groups.scrollTop = elements.groups.scrollHeight;
-  });
-}
-
-function setupWidgetLink() {
-  if (!elements.widget || !SETTINGS.inviteUrl) {
-    return;
-  }
-
-  const openInvite = () => {
-    window.open(SETTINGS.inviteUrl, "_blank", "noopener,noreferrer");
-  };
-
-  elements.widget.classList.add("widget-clickable");
-  elements.widget.setAttribute("tabindex", "0");
-  elements.widget.setAttribute("role", "link");
-  elements.widget.setAttribute("aria-label", "Open Discord invite");
-  elements.widget.addEventListener("click", openInvite);
-  elements.widget.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openInvite();
-    }
   });
 }
 
@@ -153,39 +131,6 @@ function renderSections(sections) {
   scrollGroupsToBottom();
 }
 
-async function loadDiscordGroups(guildId) {
-  const endpoint = `https://discord.com/api/guilds/${guildId}/widget.json`;
-  const response = await fetch(endpoint, { cache: "no-store" });
-
-  if (!response.ok) {
-    throw new Error(`Discord widget request failed: ${response.status}`);
-  }
-
-  const payload = await response.json();
-  const channels = Array.isArray(payload.channels) ? payload.channels : [];
-  const members = Array.isArray(payload.members) ? payload.members : [];
-
-  const membersByChannel = new Map();
-  for (const member of members) {
-    const channelId = member.channel_id || "no-channel";
-    const current = membersByChannel.get(channelId) || 0;
-    membersByChannel.set(channelId, current + 1);
-  }
-
-  const voiceChannels = channels
-    .map((channel) => ({
-      name: channel?.name || "Unnamed Channel",
-      type: "voice",
-      memberCount: membersByChannel.get(channel.id) || 0,
-      userLimit: 0,
-      sort: channel?.position ?? Number.MAX_SAFE_INTEGER
-    }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ name, type, memberCount, userLimit }) => ({ name, type, memberCount, userLimit }));
-
-  return [{ name: "Voice channels", channels: voiceChannels }];
-}
-
 async function loadBackendGroups(endpoint) {
   const response = await fetch(endpoint, { cache: "no-store" });
 
@@ -237,28 +182,8 @@ function escapeHtml(value) {
 
 async function refresh() {
   try {
-    if (SETTINGS.mode === "backend") {
-      if (SETTINGS.backendUrl) {
-        renderSections(await loadBackendGroups(SETTINGS.backendUrl));
-        return;
-      }
-
-      if (SETTINGS.discordGuildId) {
-        renderSections(await loadDiscordGroups(SETTINGS.discordGuildId));
-        return;
-      }
-
-      renderSections([]);
-      return;
-    }
-
-    if (SETTINGS.mode === "discord") {
-      if (!SETTINGS.discordGuildId) {
-        renderSections([]);
-        return;
-      }
-
-      renderSections(await loadDiscordGroups(SETTINGS.discordGuildId));
+    if (SETTINGS.mode === "backend" && SETTINGS.backendUrl) {
+      renderSections(await loadBackendGroups(SETTINGS.backendUrl));
       return;
     }
 
@@ -291,7 +216,5 @@ applyChrome();
 refresh();
 setInterval(refresh, SETTINGS.refreshMs);
 
-// NOTE: the click-to-Discord link-out is intentionally disabled.
-// Twitch review policy 4.5 rejects Extensions whose principal use is linking
-// viewers to an external site (Discord). This panel is now informational only.
-// To re-enable for a private Hosted Test build, call setupWidgetLink() here.
+// This panel is informational only: it displays voice channels and live
+// member counts. It contains no outbound links.

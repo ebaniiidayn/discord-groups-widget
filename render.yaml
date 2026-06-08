@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: discord-groups-backend
+    name: team-voice-panel
     runtime: node
     rootDir: server
     plan: free
